@@ -1,2 +1,7 @@
 raw_data/
 data_folder/
+ai_for_finance/
+*.egg-info/
+*_cache/
+
+.env
