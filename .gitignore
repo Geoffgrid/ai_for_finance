@@ -1,7 +1,15 @@
 # Data files
 raw_data/
+data_folder/
 notebooks/notebook.ipynb
+
+# Python package files
+ai_for_finance/
+*.egg-info/
+*_cache/
+
+# Environment variables
+.env
 
 # VS Code
 *.code-workspace
-ai_for_finance.code-workspace
