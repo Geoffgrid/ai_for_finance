@@ -1,2 +1,7 @@
+# Data files
 raw_data/
+notebooks/notebook.ipynb
+
+# VS Code
+*.code-workspace
 ai_for_finance.code-workspace
