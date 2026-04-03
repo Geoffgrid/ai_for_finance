@@ -14,7 +14,6 @@ app.add_middleware(
 
 @app.get("/predict")
 def predict(
-        date: str,
         close: float,
         high: float,
         low: float,
@@ -22,7 +21,6 @@ def predict(
         volume: int
     ):
     return {
-        'date': date,
         'close': close,
         'high': high,
         'low': low,
