@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+from app.ai_for_finance import my_prediction_function
 
 # Cross-Origin Middleware Resource Sharing (CORS)
 app.add_middleware(
@@ -14,23 +15,14 @@ app.add_middleware(
 
 @app.get("/predict")
 def predict(
-        date: str,
-        close: float,
-        high: float,
-        low: float,
-        open: float,
-        volume: int
-    ):
-    return {
-        'date': date,
-        'close': close,
-        'high': high,
-        'low': low,
-        'open': open,
-        'volume': volume,
-        'message': 'Mock API response'
-    }
-
+    open_price:float,
+    high:float,
+    low:float,
+    close:float,
+    volume:int
+):
+    prediction = my_prediction_function(open_price, high, low, close, volume)
+    return {"prediction": int(prediction[0])}
 
 @app.get("/")
 def root():
