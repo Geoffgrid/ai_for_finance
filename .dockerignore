@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.envrc
+.venv
+venv
+ai_for_finance
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.ipynb_checkpoints
+notebook/
+tests/
+data_folder/
