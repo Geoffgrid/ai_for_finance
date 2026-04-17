@@ -3,7 +3,8 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 
-API_URL = "http://127.0.0.1:8000/predict_xgboost"
+# API_URL = "http://127.0.0.1:8000/predict_xgboost"
+API_URL = "https://ai-for-finance-app-688958849481.europe-west1.run.app/predict_xgboost"
 
 st.set_page_config(layout="wide")
 st.title("Bitcoin — Signal ML")

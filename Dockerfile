@@ -14,6 +14,7 @@ COPY app ./app
 COPY setup.py .
 
 COPY models models
+COPY data_folder data_folder
 
 EXPOSE 8080
 
