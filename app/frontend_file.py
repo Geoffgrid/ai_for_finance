@@ -17,7 +17,8 @@ with st.sidebar:
     st.divider()
     st.subheader("Stratégies")
 
-    show_signal = st.checkbox("Signal ML", value=True)
+    show_signal = st.checkbox("Signal ML (threshold 0.5)", value=True)
+    show_flex = st.checkbox("Signal personnalisé (threshold ajustable)", value=True)
     show_long_only = st.checkbox("Long only", value=True)
     show_random = st.checkbox("Random", value=False)
 
@@ -110,14 +111,14 @@ if "df" in st.session_state:
     }
     active = {
         "signal": show_signal,
-        "flex signal": show_signal,
+        "flex signal": show_flex,
         "long_only": show_long_only,
         "random": show_random
     }
 
     for mode, show in active.items():
         if show:
-            vals = simulate_portfolio(df, mode, horizon)
+            vals = simulate_portfolio(df, mode, horizon, threshold)
             fig.add_trace(go.Scatter(
                 x=df["Date"], y=vals,
                 name=strat_labels[mode],
