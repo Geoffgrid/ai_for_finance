@@ -55,4 +55,11 @@ def xg_boost_predict( date_pivot :str = '2023-11-04', optional_user_date:str = '
 
     prediction_xgb, probability_xgb = xgboost_prediction_function(sub_df)
 
-    return {"prediction": int(prediction_xgb[-1]), "probability": float(probability_xgb[-1])}
+    result_df = sub_df.copy()
+    result_df["prediction"] = prediction_xgb
+    result_df["probability"] = probability_xgb
+
+
+    #return {"prediction": int(prediction_xgb[-1]), "probability": float(probability_xgb[-1])}
+
+    return {'df_for_streamlit': result_df.to_dict(orient='records')}
