@@ -26,3 +26,19 @@ if submit:
     response = requests.get(API_URL, params=params)
     result = response.json()
     st.success(f"Will the price increse in the next five days : {bool(result['prediction'])}")
+
+
+   '''
+    #format de api:
+    Liste de dictionnaires (un par ligne du df) :
+    #{
+      "Date": "2023-11-21T00:00:00",
+      "Open": 37469.16015625,
+      "High": 37631.140625,
+      "Low": 35813.8125,
+      "Close": 35813.8125,
+      "Volume": 25172163756,
+      "prediction": 1,
+      "probability": 0.5361626148223877
+    }
+    '''
