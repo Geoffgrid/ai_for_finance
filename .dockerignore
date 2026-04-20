@@ -10,6 +10,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.ipynb_checkpoints
+*.csv
 notebook/
 tests/
 data_folder/
