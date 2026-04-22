@@ -30,9 +30,8 @@ with st.sidebar:
     st.subheader("Capital initial")
     capital = st.number_input("$", min_value=100, value=10000, step=100)
 
-#    st.divider()
-#    horizon = st.slider("Horizon de prédiction (jours)", min_value=1, max_value=20, value=5)
-    horizon = 5
+    st.divider()
+    horizon = st.slider("Horizon de prédiction (jours)", min_value=1, max_value=20, value=5)
 
     load = st.button("Charger les données", type="primary")
 
