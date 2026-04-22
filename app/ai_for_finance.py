@@ -5,6 +5,7 @@ import pandas as pd
 
 import __main__
 from app.ml_logic.features import build_technical_features
+from app.ml_logic.rnn_inference import rnn_predict_from_artifacts
 
 
 ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -38,20 +39,13 @@ def xgboost_prediction_function(df:pd.DataFrame):
     return prediction_xgb, probability_xgb
 
 
-def rnn_prediction_function(df:pd.DataFrame):
-    model_rnn_path = os.path.join(ROOT_PATH, 'models', 'rnn_preprocessing.pkl')
-
+def rnn_prediction_function(df: pd.DataFrame):
     __main__.build_technical_features = build_technical_features
-
-    with open(model_rnn_path, 'rb') as file:
-        model_rnn = pickle.load(file)
-        prediction_rnn = model_rnn.predict(df)
-        probability_rnn = model_rnn.predict_proba(df)[:, 1]  # Probabilité de la classe positive
-
+    prediction_rnn, probability_rnn = rnn_predict_from_artifacts(df, ROOT_PATH)
     return prediction_rnn, probability_rnn
 
 def linear_prediction_function(df:pd.DataFrame):
-    model_linear_path = os.path.join(ROOT_PATH, 'models', 'last_linear_pipeline.pkl')
+    model_linear_path = os.path.join(ROOT_PATH, 'models', 'average_linear_pipeline.pkl')
 
     __main__.build_technical_features = build_technical_features
 

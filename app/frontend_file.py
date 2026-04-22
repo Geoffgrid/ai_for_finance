@@ -157,11 +157,31 @@ if "df" in st.session_state:
     mask_above = x_all >= threshold
     mask_below = x_all < threshold
 
-    slope_all, intercept_all, _, _, _ = scipy_stats.linregress(x_all, y_all)
-    slope_above, intercept_above, _, _, _ = scipy_stats.linregress(x_all[mask_above], y_all[mask_above])
-    slope_below, intercept_below, _, _, _ = scipy_stats.linregress(x_all[mask_below], y_all[mask_below])
+    def ols_slope_intercept(x, y):
+        """OLS ; si toutes les x sont identiques ou n<2, retourne une horizontale (pente 0) ou (nan, nan)."""
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        ok = np.isfinite(x) & np.isfinite(y)
+        x, y = x[ok], y[ok]
+        n = x.size
+        if n < 1:
+            return np.nan, np.nan
+        if n == 1:
+            return 0.0, float(y[0])
+        if np.ptp(x) == 0.0 or np.std(x) == 0.0:
+            return 0.0, float(np.mean(y))
+        slope, intercept, _, _, _ = scipy_stats.linregress(x, y)
+        return float(slope), float(intercept)
 
-    x_line = np.linspace(x_all.min(), x_all.max(), 200)
+    slope_all, intercept_all = ols_slope_intercept(x_all, y_all)
+    slope_above, intercept_above = ols_slope_intercept(x_all[mask_above], y_all[mask_above])
+    slope_below, intercept_below = ols_slope_intercept(x_all[mask_below], y_all[mask_below])
+
+    if x_all.size and x_all.min() == x_all.max():
+        # Probas constantes : droite = horizontale (moyenne y), étendue sur l’axe proba
+        x_line = np.linspace(0, 1, 200)
+    else:
+        x_line = np.linspace(x_all.min(), x_all.max(), 200)
 
     fig2 = go.Figure()
 
@@ -184,26 +204,28 @@ if "df" in st.session_state:
         name="Cash"
     ))
 
-    # Régression générale
-    fig2.add_trace(go.Scatter(
-        x=x_line, y=slope_all * x_line + intercept_all,
-        mode="lines", line=dict(color="#378ADD", width=1.5, dash="dot"),
-        name="Régression générale"
-    ))
+    # Régressions (ignorées si échantillon vide pour un groupe)
+    if np.isfinite(slope_all) and np.isfinite(intercept_all):
+        y_line = slope_all * x_line + intercept_all
+        fig2.add_trace(go.Scatter(
+            x=x_line, y=y_line,
+            mode="lines", line=dict(color="#378ADD", width=1.5, dash="dot"),
+            name="Régression générale"
+        ))
 
-    # Régression linéaire investi
-    fig2.add_trace(go.Scatter(
-        x=x_line, y=slope_above * x_line + intercept_above,
-        mode="lines", line=dict(color="#1D9E75", width=2),
-        name=f"Régression investi (≥ {threshold})"
-    ))
+    if np.isfinite(slope_above) and np.isfinite(intercept_above):
+        fig2.add_trace(go.Scatter(
+            x=x_line, y=slope_above * x_line + intercept_above,
+            mode="lines", line=dict(color="#1D9E75", width=2),
+            name=f"Régression investi (≥ {threshold})"
+        ))
 
-    # Régression linéaire cash
-    fig2.add_trace(go.Scatter(
-        x=x_line, y=slope_below * x_line + intercept_below,
-        mode="lines", line=dict(color="#E24B4A", width=2),
-        name=f"Régression cash (< {threshold})"
-    ))
+    if np.isfinite(slope_below) and np.isfinite(intercept_below):
+        fig2.add_trace(go.Scatter(
+            x=x_line, y=slope_below * x_line + intercept_below,
+            mode="lines", line=dict(color="#E24B4A", width=2),
+            name=f"Régression cash (< {threshold})"
+        ))
 
     # # Boxplot cash — rendements réels sur yaxis2
     # fig2.add_trace(go.Box(
