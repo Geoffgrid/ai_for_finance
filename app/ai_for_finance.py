@@ -50,13 +50,25 @@ def rnn_prediction_function(df:pd.DataFrame):
 
     return prediction_rnn, probability_rnn
 
+def linear_prediction_function(df:pd.DataFrame):
+    model_linear_path = os.path.join(ROOT_PATH, 'models', 'last_linear_pipeline.pkl')
+
+    __main__.build_technical_features = build_technical_features
+
+    with open(model_linear_path, 'rb') as file:
+        model_linear = pickle.load(file)
+        prediction_linear = model_linear.predict(df)
+        probability_linear = model_linear.predict_proba(df)[:, 1]  # Probabilité de la classe positive
+
+    return prediction_linear, probability_linear
 
 
 def global_prediction_function(df: pd.DataFrame, model_name: str):
 
     model_functions = {
         "xgb": xgboost_prediction_function,
-        "rnn": rnn_prediction_function
+        "rnn": rnn_prediction_function,
+        "linear": linear_prediction_function
     }
 
     if model_name not in model_functions:
