@@ -13,6 +13,11 @@ install_package:
 run_api:
 	uvicorn app.api.fast:app --reload
 
+
+build_img_local:
+	docker build -t ${IMAGE}:local .
+
+
 build_for_production:
 	docker build \
 		--platform linux/amd64 \
