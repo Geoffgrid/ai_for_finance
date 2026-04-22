@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats as scipy_stats
 from datetime import date
 
-API_URL = "http://127.0.0.1:8000/predict_xgboost"
+API_URL = "http://127.0.0.1:8000/global_predict"
 
 st.set_page_config(layout="wide")
 st.title("Bitcoin — Signal ML")
@@ -32,11 +32,19 @@ with st.sidebar:
 
     horizon = 5
 
+    st.divider()
+    st.subheader("Modèle")
+    model_name = st.selectbox(
+    "Modèle",
+    options=["xgb", "rnn", "linear"],
+    format_func=lambda x: {"xgb": "XGBoost", "rnn": "RNN", "linear": "Régression linéaire"}[x]
+    )
+
     load = st.button("Charger les données", type="primary")
 
 # ── DATA LOADING ─────────────────────────────────────────────────
 if load:
-    response = requests.get(API_URL, params={"date_pivot": date_pivot})
+    response = requests.get(API_URL, params={"date_pivot": date_pivot, "model_name": model_name})
     data = response.json()
     df = pd.DataFrame(data["df_for_streamlit"])
     df["Date"] = pd.to_datetime(df["Date"])
@@ -143,11 +151,11 @@ if "df" in st.session_state:
     df_scatter["real_return"] = df_scatter["Close"].shift(-horizon) / df_scatter["Close"] - 1
     df_scatter = df_scatter.dropna(subset=["real_return"])
 
-    x_all = df_scatter["real_return"].values * 100
-    y_all = df_scatter["probability"].values
+    x_all = y_all_orig = df_scatter["probability"].values  # proba en x
+    y_all = df_scatter["real_return"].values * 100          # rendement en y
 
-    mask_above = y_all >= threshold
-    mask_below = y_all < threshold
+    mask_above = x_all >= threshold
+    mask_below = x_all < threshold
 
     slope_all, intercept_all, _, _, _ = scipy_stats.linregress(x_all, y_all)
     slope_above, intercept_above, _, _, _ = scipy_stats.linregress(x_all[mask_above], y_all[mask_above])
@@ -163,7 +171,7 @@ if "df" in st.session_state:
         mode="markers",
         marker=dict(color="#1D9E75", size=3, opacity=0.6),
         text=df_scatter[mask_above]["Date"].dt.strftime("%Y-%m-%d"),
-        hovertemplate="Date: %{text}<br>Rendement: %{x:.1f}%<br>Proba: %{y:.2f}<extra></extra>",
+        hovertemplate="Date: %{text}<br>Proba: %{x:.2f}<br>Rendement: %{y:.1f}%<extra></extra>",
         name="Investi"
     ))
 
@@ -172,7 +180,7 @@ if "df" in st.session_state:
         mode="markers",
         marker=dict(color="#E24B4A", size=3, opacity=0.6),
         text=df_scatter[mask_below]["Date"].dt.strftime("%Y-%m-%d"),
-        hovertemplate="Date: %{text}<br>Rendement: %{x:.1f}%<br>Proba: %{y:.2f}<extra></extra>",
+        hovertemplate="Date: %{text}<br>Proba: %{x:.2f}<br>Rendement: %{y:.1f}%<extra></extra>",
         name="Cash"
     ))
 
@@ -197,40 +205,40 @@ if "df" in st.session_state:
         name=f"Régression cash (< {threshold})"
     ))
 
-    # Boxplot cash — rendements réels sur yaxis2
-    fig2.add_trace(go.Box(
-        y=x_all[mask_below],
-        x=["Cash"] * mask_below.sum(),
-        name="Cash — rendements réels",
-        marker_color="#E24B4A",
-        boxmean=True,
-        width=0.3,
-        xaxis="x2",
-        yaxis="y2"
-    ))
+    # # Boxplot cash — rendements réels sur yaxis2
+    # fig2.add_trace(go.Box(
+    #     y=x_all[mask_below],
+    #     x=["Cash"] * mask_below.sum(),
+    #     name="Cash — rendements réels",
+    #     marker_color="#E24B4A",
+    #     boxmean=True,
+    #     width=0.3,
+    #     xaxis="x2",
+    #     yaxis="y2"
+    # ))
 
-    # Boxplot investi — rendements réels sur yaxis2
-    fig2.add_trace(go.Box(
-        y=x_all[mask_above],
-        x=["Investi"] * mask_above.sum(),
-        name="Investi — rendements réels",
-        marker_color="#1D9E75",
-        boxmean=True,
-        width=0.3,
-        xaxis="x2",
-        yaxis="y2"
-    ))
+    # # Boxplot investi — rendements réels sur yaxis2
+    # fig2.add_trace(go.Box(
+    #     y=x_all[mask_above],
+    #     x=["Investi"] * mask_above.sum(),
+    #     name="Investi — rendements réels",
+    #     marker_color="#1D9E75",
+    #     boxmean=True,
+    #     width=0.3,
+    #     xaxis="x2",
+    #     yaxis="y2"
+    # ))
 
-    fig2.add_hline(y=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7,
-                   annotation_text=f"Threshold ({threshold})", annotation_position="right")
-    fig2.add_vline(x=0, line_dash="dash", line_color="gray", opacity=0.4)
+    fig2.add_vline(x=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7,
+                   annotation_text=f"Threshold ({threshold})", annotation_position="top right")
+    fig2.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.4)
 
     fig2.update_layout(
         template="plotly_dark",
-        height=600,
-        xaxis=dict(title="Mouvement réel à t+horizon (%)", domain=[0, 0.78]),
+        height=500,
+        xaxis=dict(title="Probabilité du signal", domain=[0, 0.78]),
         xaxis2=dict(domain=[0.82, 1]),
-        yaxis=dict(title="Probabilité du signal", range=[0.4, 0.6]),
+        yaxis=dict(title="Mouvement réel à t+horizon (%)"),
         yaxis2=dict(title="Rendement réel (%)", anchor="x2"),
         legend=dict(orientation="h", y=-0.2),
         boxmode="group"
