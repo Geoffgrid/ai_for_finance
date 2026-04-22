@@ -3,7 +3,6 @@ altair==6.0.0
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
--e git+https://github.com/Geoffgrid/ai_for_finance.git@ef737868c3f6621286bcd5a2a276db45cb1e9297#egg=app
 appnope==0.1.4
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
