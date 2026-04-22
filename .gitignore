@@ -5,3 +5,4 @@ ai_for_finance/
 data_folder/
 *_pycache_/
 .env
+.streamlit/secrets.toml
