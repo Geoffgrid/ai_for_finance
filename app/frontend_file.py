@@ -327,7 +327,24 @@ if "df" in st.session_state:
     stats_df = pd.DataFrame(stats_rows).set_index("Stratégie")
     st.dataframe(stats_df, use_container_width=True)
 
-    # ── PERFORMANCES MENSUELLES ──────────────────────────────────
+    # Accuracy sur les 3 populations
+    df_eval = df.copy()
+    df_eval["real_up"] = (df_eval["Close"].shift(-horizon) > df_eval["Close"]).astype(int)
+    df_eval = df_eval.dropna(subset=["real_up"])
+
+    mask_inv = df_eval["probability"] >= threshold
+    mask_cash = df_eval["probability"] < threshold
+
+    acc_all = (df_eval["prediction"] == df_eval["real_up"]).mean()
+    acc_inv = (df_eval[mask_inv]["prediction"] == df_eval[mask_inv]["real_up"]).mean()
+    acc_cash = (df_eval[mask_cash]["prediction"] == df_eval[mask_cash]["real_up"]).mean()
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Accuracy globale", f"{acc_all:.1%}")
+    col2.metric(f"Accuracy investi (≥{threshold})", f"{acc_inv:.1%}")
+    col3.metric(f"Accuracy cash (<{threshold})", f"{acc_cash:.1%}")
+
+# ── PERFORMANCES MENSUELLES ──────────────────────────────────
     st.subheader("Performances mensuelles — Signal ML")
 
     signal_vals = simulate_portfolio(df, "flex signal", horizon, threshold)
