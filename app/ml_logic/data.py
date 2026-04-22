@@ -8,7 +8,7 @@ CACHE_DIR = Path(__file__).resolve().parents[2] / 'data_folder' / 'cache'
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_TICKERS = ['BTC-USD']
-DEFAULT_YEARS = 10
+DEFAULT_YEARS = 1
 
 
 def _cache_path(ticker: str) -> Path:
@@ -41,6 +41,7 @@ def _save_cache(ticker: str, df: pd.DataFrame):
 def get_financial_data(
     tickers: list[str] = DEFAULT_TICKERS,
     period_years: int = DEFAULT_YEARS,
+    delta: int = 365,
     force_refresh: bool = False
 ) -> dict[str, pd.DataFrame]:
     """
@@ -55,7 +56,7 @@ def get_financial_data(
         dict { ticker: DataFrame } avec colonnes Open, High, Low, Close, Volume
     """
     end = datetime.today().strftime('%Y-%m-%d')
-    start_full = (datetime.today() - timedelta(days=365 * period_years)).strftime('%Y-%m-%d')
+    start_full = (datetime.today() - timedelta(days=delta * period_years)).strftime('%Y-%m-%d')
 
     results = {}
 
@@ -86,3 +87,46 @@ def get_financial_data(
         results[ticker] = df
 
     return results
+
+
+def _parse_tickers(raw_tickers: str) -> list[str]:
+    tickers = [ticker.strip() for ticker in raw_tickers.split(",") if ticker.strip()]
+    return tickers or DEFAULT_TICKERS
+
+
+def run_daily_refresh():
+    """
+    Refresh cached financial data using env-configured parameters.
+    """
+    tickers = _parse_tickers(os.environ.get("DATA_TICKERS", ",".join(DEFAULT_TICKERS)))
+    period_years = int(os.environ.get("DATA_PERIOD_YEARS", "1"))
+    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "1"))
+    force_refresh = os.environ.get("DATA_FORCE_REFRESH", "false").lower() == "true"
+    get_financial_data(
+        tickers=tickers,
+        period_years=period_years,
+        delta=delta_days,
+        force_refresh=force_refresh
+    )
+
+
+def ensure_market_data_up_to_date(tickers: list[str] | None = None):
+    """
+    Refresh market data cache incrementally using env defaults.
+    """
+    configured_tickers = _parse_tickers(
+        os.environ.get("DATA_TICKERS", ",".join(DEFAULT_TICKERS))
+    )
+    selected_tickers = tickers or configured_tickers
+    period_years = int(os.environ.get("DATA_PERIOD_YEARS", "1"))
+    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "1"))
+    get_financial_data(
+        tickers=selected_tickers,
+        period_years=period_years,
+        delta=delta_days,
+        force_refresh=False
+    )
+
+
+if __name__ == "__main__":
+    run_daily_refresh()

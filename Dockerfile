@@ -3,6 +3,9 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
+ENV DATA_TICKERS=BTC-USD,ETH-USD,SPY
+ENV DATA_PERIOD_YEARS=1
+ENV DATA_DELTA_DAYS=1
 
 WORKDIR /app
 
@@ -15,7 +18,7 @@ COPY setup.py .
 
 COPY models models
 
-RUN python -c "from app.ml_logic.data import get_financial_data; get_financial_data(tickers=['BTC-USD','ETH-USD','SPY'], period_years=10)"
+RUN python -m app.ml_logic.data
 
 EXPOSE 8080
 

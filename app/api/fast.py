@@ -8,6 +8,17 @@ from fastapi import FastAPI, HTTPException
 app = FastAPI()
 from app.ai_for_finance import global_prediction_function, my_prediction_function, xgboost_prediction_function
 from app.ml_logic.features import build_technical_features
+from app.ml_logic.data import ensure_market_data_up_to_date
+
+
+def _refresh_data_for_inference():
+    """
+    Reusable market data refresh step for inference endpoints.
+    """
+    try:
+        ensure_market_data_up_to_date(tickers=["BTC-USD"])
+    except Exception as error:
+        print(f"Market data refresh failed: {error}")
 
 # Cross-Origin Middleware Resource Sharing (CORS)
 app.add_middleware(
@@ -26,6 +37,7 @@ def predict(
     close:float,
     volume:int
 ):
+    _refresh_data_for_inference()
     prediction = my_prediction_function(open_price, high, low, close, volume)
     return {"prediction": int(prediction[0])}
 
@@ -39,6 +51,7 @@ def root():
 
 @app.get("/predict_xgboost")
 def xg_boost_predict( date_pivot :str = '2023-11-04', optional_user_date:str = '2026-04-01'):
+    _refresh_data_for_inference()
 
      # Charger le CSV
     df = pd.read_csv("data_folder/cache/BTC-USD.csv")
