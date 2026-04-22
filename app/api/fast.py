@@ -90,6 +90,8 @@ def predict_model(
     date_pivot: str = "2023-11-04",
     optional_user_date: str = "2026-04-01",
 ):
+    _refresh_data_for_inference()
+
     try:
         # Charger le CSV
         df = pd.read_csv("data_folder/cache/BTC-USD.csv")
