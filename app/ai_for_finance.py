@@ -39,7 +39,7 @@ def xgboost_prediction_function(df:pd.DataFrame):
 
 
 def rnn_prediction_function(df:pd.DataFrame):
-    model_rnn_path = os.path.join(ROOT_PATH, 'models', 'rnn_modelrn.pkl')
+    model_rnn_path = os.path.join(ROOT_PATH, 'models', 'rnn_preprocessing.pkl')
 
     __main__.build_technical_features = build_technical_features
 
