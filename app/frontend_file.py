@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.graph_objects as go
+import numpy as np
+from scipy import stats as scipy_stats
+from datetime import date
 
 API_URL = "http://127.0.0.1:8000/predict_xgboost"
 
@@ -12,7 +15,8 @@ st.title("Bitcoin — Signal ML")
 with st.sidebar:
     st.header("Paramètres")
 
-    date_pivot = st.text_input("Date cutoff training", value="2023-11-04")
+    date_pivot = st.date_input("Date cutoff training", value=date(2024, 1, 1), min_value=date(2023, 11, 4), max_value=date.today())
+    date_pivot = date_pivot.strftime("%Y-%m-%d")
 
     st.divider()
     st.subheader("Stratégies")
@@ -26,12 +30,6 @@ with st.sidebar:
     st.subheader("Seuil de proba pour signal d'achat")
     threshold = st.slider("Seuil", min_value=0.5, max_value=0.75, value=0.5, step=0.005)
 
-    st.divider()
-    st.subheader("Capital initial")
-    capital = st.number_input("$", min_value=100, value=10000, step=100)
-
-#    st.divider()
-#    horizon = st.slider("Horizon de prédiction (jours)", min_value=1, max_value=20, value=5)
     horizon = 5
 
     load = st.button("Charger les données", type="primary")
@@ -138,20 +136,104 @@ if "df" in st.session_state:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Probabilité du signal
-    st.subheader("Probabilité du signal")
+    # Nuage de points : probabilité vs mouvement réel
+    st.subheader("Probabilité du signal vs mouvement réel")
+
+    df_scatter = df.copy()
+    df_scatter["real_return"] = df_scatter["Close"].shift(-horizon) / df_scatter["Close"] - 1
+    df_scatter = df_scatter.dropna(subset=["real_return"])
+
+    x_all = df_scatter["real_return"].values * 100
+    y_all = df_scatter["probability"].values
+
+    mask_above = y_all >= threshold
+    mask_below = y_all < threshold
+
+    slope_all, intercept_all, _, _, _ = scipy_stats.linregress(x_all, y_all)
+    slope_above, intercept_above, _, _, _ = scipy_stats.linregress(x_all[mask_above], y_all[mask_above])
+    slope_below, intercept_below, _, _, _ = scipy_stats.linregress(x_all[mask_below], y_all[mask_below])
+
+    x_line = np.linspace(x_all.min(), x_all.max(), 200)
+
     fig2 = go.Figure()
+
+    # Points
     fig2.add_trace(go.Scatter(
-        x=df["Date"], y=df["probability"],
-        name="Probabilité",
-        line=dict(color="#EF9F27", width=1.5),
-        fill="tozeroy", fillcolor="rgba(239,159,39,0.1)"
+        x=x_all[mask_above], y=y_all[mask_above],
+        mode="markers",
+        marker=dict(color="#1D9E75", size=3, opacity=0.6),
+        text=df_scatter[mask_above]["Date"].dt.strftime("%Y-%m-%d"),
+        hovertemplate="Date: %{text}<br>Rendement: %{x:.1f}%<br>Proba: %{y:.2f}<extra></extra>",
+        name="Investi"
     ))
-    fig2.add_hline(y=0.5, line_dash="dash", line_color="gray")
+
+    fig2.add_trace(go.Scatter(
+        x=x_all[mask_below], y=y_all[mask_below],
+        mode="markers",
+        marker=dict(color="#E24B4A", size=3, opacity=0.6),
+        text=df_scatter[mask_below]["Date"].dt.strftime("%Y-%m-%d"),
+        hovertemplate="Date: %{text}<br>Rendement: %{x:.1f}%<br>Proba: %{y:.2f}<extra></extra>",
+        name="Cash"
+    ))
+
+    # Régression générale
+    fig2.add_trace(go.Scatter(
+        x=x_line, y=slope_all * x_line + intercept_all,
+        mode="lines", line=dict(color="#378ADD", width=1.5, dash="dot"),
+        name="Régression générale"
+    ))
+
+    # Régression linéaire investi
+    fig2.add_trace(go.Scatter(
+        x=x_line, y=slope_above * x_line + intercept_above,
+        mode="lines", line=dict(color="#1D9E75", width=2),
+        name=f"Régression investi (≥ {threshold})"
+    ))
+
+    # Régression linéaire cash
+    fig2.add_trace(go.Scatter(
+        x=x_line, y=slope_below * x_line + intercept_below,
+        mode="lines", line=dict(color="#E24B4A", width=2),
+        name=f"Régression cash (< {threshold})"
+    ))
+
+    # Boxplot cash — rendements réels sur yaxis2
+    fig2.add_trace(go.Box(
+        y=x_all[mask_below],
+        x=["Cash"] * mask_below.sum(),
+        name="Cash — rendements réels",
+        marker_color="#E24B4A",
+        boxmean=True,
+        width=0.3,
+        xaxis="x2",
+        yaxis="y2"
+    ))
+
+    # Boxplot investi — rendements réels sur yaxis2
+    fig2.add_trace(go.Box(
+        y=x_all[mask_above],
+        x=["Investi"] * mask_above.sum(),
+        name="Investi — rendements réels",
+        marker_color="#1D9E75",
+        boxmean=True,
+        width=0.3,
+        xaxis="x2",
+        yaxis="y2"
+    ))
+
+    fig2.add_hline(y=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7,
+                   annotation_text=f"Threshold ({threshold})", annotation_position="right")
+    fig2.add_vline(x=0, line_dash="dash", line_color="gray", opacity=0.4)
+
     fig2.update_layout(
-        template="plotly_dark", height=200,
-        yaxis=dict(range=[0, 1]),
-        showlegend=False
+        template="plotly_dark",
+        height=600,
+        xaxis=dict(title="Mouvement réel à t+horizon (%)", domain=[0, 0.78]),
+        xaxis2=dict(domain=[0.82, 1]),
+        yaxis=dict(title="Probabilité du signal", range=[0.4, 0.6]),
+        yaxis2=dict(title="Rendement réel (%)", anchor="x2"),
+        legend=dict(orientation="h", y=-0.2),
+        boxmode="group"
     )
     st.plotly_chart(fig2, use_container_width=True)
 
