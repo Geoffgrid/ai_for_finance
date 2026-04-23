@@ -57,6 +57,7 @@ def get_financial_data(
     """
     end = datetime.today().strftime('%Y-%m-%d')
     start_full = (datetime.today() - timedelta(days=delta * period_years)).strftime('%Y-%m-%d')
+    expected_start = pd.to_datetime(start_full)
 
     results = {}
 
@@ -64,6 +65,16 @@ def get_financial_data(
         print(f"[{ticker}] ", end='')
 
         cached = _load_cache(ticker) if not force_refresh else None
+
+        if cached is not None and not force_refresh:
+            first_date = pd.Timestamp(cached.index[0])
+            # Cache tronqué (ex. image Docker avec seulement 1–2 jours) : refaire un téléchargement complet
+            if first_date > expected_start + pd.Timedelta(days=1):
+                print(
+                    f"cache incomplet (début {first_date.date()} > cible {start_full}), "
+                    f"retéléchargement complet ({period_years} an(s))..."
+                )
+                cached = None
 
         if cached is None:
             print(f"téléchargement complet ({period_years} ans)...")
@@ -100,7 +111,8 @@ def run_daily_refresh():
     """
     tickers = _parse_tickers(os.environ.get("DATA_TICKERS", ",".join(DEFAULT_TICKERS)))
     period_years = int(os.environ.get("DATA_PERIOD_YEARS", "1"))
-    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "1"))
+    # Jours par « année » pour delta * period_years (365 × 1 = ~1 an d’historique)
+    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "365"))
     force_refresh = os.environ.get("DATA_FORCE_REFRESH", "false").lower() == "true"
     get_financial_data(
         tickers=tickers,
@@ -119,7 +131,7 @@ def ensure_market_data_up_to_date(tickers: list[str] | None = None):
     )
     selected_tickers = tickers or configured_tickers
     period_years = int(os.environ.get("DATA_PERIOD_YEARS", "1"))
-    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "1"))
+    delta_days = int(os.environ.get("DATA_DELTA_DAYS", "365"))
     get_financial_data(
         tickers=selected_tickers,
         period_years=period_years,
