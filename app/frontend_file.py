@@ -9,38 +9,38 @@ from datetime import date
 API_URL = "http://127.0.0.1:8000/global_predict"
 
 st.set_page_config(layout="wide")
-st.title("Bitcoin — Signal ML")
+st.title("Bitcoin — ML Signal")
 
 # ── SIDE PANEL ──────────────────────────────────────────────────
 with st.sidebar:
-    st.header("Paramètres")
+    st.header("Parameters")
 
-    date_pivot = st.date_input("Date cutoff training", value=date(2024, 1, 1), min_value=date(2023, 11, 4), max_value=date.today())
+    date_pivot = st.date_input("Training cutoff date", value=date(2024, 1, 1), min_value=date(2023, 11, 4), max_value=date.today())
     date_pivot = date_pivot.strftime("%Y-%m-%d")
 
     st.divider()
-    st.subheader("Stratégies")
+    st.subheader("Strategies")
 
-    show_signal = st.checkbox("Signal ML (threshold 0.5)", value=True)
-    show_flex = st.checkbox("Signal personnalisé (threshold ajustable)", value=True)
+    show_signal = st.checkbox("ML Signal (threshold 0.5)", value=True)
+    show_flex = st.checkbox("Custom signal (adjustable threshold)", value=True)
     show_long_only = st.checkbox("Long only", value=True)
     show_random = st.checkbox("Random", value=False)
 
     st.divider()
-    st.subheader("Seuil de proba pour signal d'achat")
-    threshold = st.slider("Seuil", min_value=0.5, max_value=0.75, value=0.5, step=0.005)
+    st.subheader("Buy signal probability threshold")
+    threshold = st.slider("Threshold", min_value=0.5, max_value=0.75, value=0.5, step=0.005)
 
     horizon = 5
 
     st.divider()
-    st.subheader("Modèle")
+    st.subheader("Model")
     model_name = st.selectbox(
-    "Modèle",
+    "Model",
     options=["xgb", "rnn", "linear"],
-    format_func=lambda x: {"xgb": "XGBoost", "rnn": "RNN", "linear": "Régression linéaire"}[x]
+    format_func=lambda x: {"xgb": "XGBoost", "rnn": "RNN", "linear": "Linear Regression"}[x]
     )
 
-    load = st.button("Charger les données", type="primary")
+    load = st.button("Load data", type="primary")
 
 # ── DATA LOADING ─────────────────────────────────────────────────
 if load:
@@ -55,11 +55,9 @@ if load:
 if "df" in st.session_state:
     df = st.session_state["df"]
 
-    # Calcul des stratégies
     def simulate_portfolio(df, mode, horizon, threshold=0.5):
         n = len(df)
 
-        # Décision par batch (tous les horizon jours)
         decisions = []
         for i in range(0, n, horizon):
             row = df.iloc[i]
@@ -82,7 +80,6 @@ if "df" in st.session_state:
 
         decisions = decisions[:n]
 
-        # Portfolio évolue jour par jour selon la décision
         portfolio = 100.0
         values = [100.0]
         for i in range(1, n):
@@ -95,11 +92,10 @@ if "df" in st.session_state:
 
     fig = go.Figure()
 
-    # Prix BTC en base 100
     btc_base100 = df["Close"] / df["Close"].iloc[0] * 100
     fig.add_trace(go.Scatter(
         x=df["Date"], y=btc_base100,
-        name="Prix BTC (base 100)",
+        name="BTC Price (base 100)",
         line=dict(color="#378ADD", width=1.5, dash="dot"),
         opacity=0.5
     ))
@@ -111,9 +107,9 @@ if "df" in st.session_state:
         "random": "#888780"
     }
     strat_labels = {
-        "signal": "Signal ML",
+        "signal": "ML Signal",
         "long_only": "Long only",
-        "flex signal": "Signal personnalisé",
+        "flex signal": "Custom signal",
         "random": "Random"
     }
     active = {
@@ -136,29 +132,28 @@ if "df" in st.session_state:
 
     fig.update_layout(
         template="plotly_dark",
-        title="Performance des stratégies (base 100)",
+        title="Strategy performance (base 100)",
         height=500,
         xaxis_title="Date",
-        yaxis_title="Valeur (base 100)",
+        yaxis_title="Value (base 100)",
         legend=dict(orientation="h", y=-0.25)
     )
     st.plotly_chart(fig, use_container_width=True, key="fig_strategies")
 
-    # Nuage de points : probabilité vs mouvement réel
-    st.subheader("Probabilité du signal vs mouvement réel")
+    # Scatter plot
+    st.subheader("Signal probability vs actual price movement")
 
     df_scatter = df.copy()
     df_scatter["real_return"] = df_scatter["Close"].shift(-horizon) / df_scatter["Close"] - 1
     df_scatter = df_scatter.dropna(subset=["real_return"])
 
-    x_all = y_all_orig = df_scatter["probability"].values  # proba en x
-    y_all = df_scatter["real_return"].values * 100          # rendement en y
+    x_all = df_scatter["probability"].values
+    y_all = df_scatter["real_return"].values * 100
 
     mask_above = x_all >= threshold
     mask_below = x_all < threshold
 
     def ols_slope_intercept(x, y):
-        """OLS ; si toutes les x sont identiques ou n<2, retourne une horizontale (pente 0) ou (nan, nan)."""
         x = np.asarray(x, dtype=float)
         y = np.asarray(y, dtype=float)
         ok = np.isfinite(x) & np.isfinite(y)
@@ -178,21 +173,19 @@ if "df" in st.session_state:
     slope_below, intercept_below = ols_slope_intercept(x_all[mask_below], y_all[mask_below])
 
     if x_all.size and x_all.min() == x_all.max():
-        # Probas constantes : droite = horizontale (moyenne y), étendue sur l’axe proba
         x_line = np.linspace(0, 1, 200)
     else:
         x_line = np.linspace(x_all.min(), x_all.max(), 200)
 
     fig2 = go.Figure()
 
-    # Points
     fig2.add_trace(go.Scatter(
         x=x_all[mask_above], y=y_all[mask_above],
         mode="markers",
         marker=dict(color="#1D9E75", size=3, opacity=0.6),
         text=df_scatter[mask_above]["Date"].dt.strftime("%Y-%m-%d"),
-        hovertemplate="Date: %{text}<br>Proba: %{x:.2f}<br>Rendement: %{y:.1f}%<extra></extra>",
-        name="Investi"
+        hovertemplate="Date: %{text}<br>Prob: %{x:.2f}<br>Return: %{y:.1f}%<extra></extra>",
+        name="Invested"
     ))
 
     fig2.add_trace(go.Scatter(
@@ -200,56 +193,30 @@ if "df" in st.session_state:
         mode="markers",
         marker=dict(color="#E24B4A", size=3, opacity=0.6),
         text=df_scatter[mask_below]["Date"].dt.strftime("%Y-%m-%d"),
-        hovertemplate="Date: %{text}<br>Proba: %{x:.2f}<br>Rendement: %{y:.1f}%<extra></extra>",
+        hovertemplate="Date: %{text}<br>Prob: %{x:.2f}<br>Return: %{y:.1f}%<extra></extra>",
         name="Cash"
     ))
 
-    # Régressions (ignorées si échantillon vide pour un groupe)
     if np.isfinite(slope_all) and np.isfinite(intercept_all):
-        y_line = slope_all * x_line + intercept_all
         fig2.add_trace(go.Scatter(
-            x=x_line, y=y_line,
+            x=x_line, y=slope_all * x_line + intercept_all,
             mode="lines", line=dict(color="#378ADD", width=1.5, dash="dot"),
-            name="Régression générale"
+            name="General regression"
         ))
 
     if np.isfinite(slope_above) and np.isfinite(intercept_above):
         fig2.add_trace(go.Scatter(
             x=x_line, y=slope_above * x_line + intercept_above,
             mode="lines", line=dict(color="#1D9E75", width=2),
-            name=f"Régression investi (≥ {threshold})"
+            name=f"Invested regression (≥ {threshold})"
         ))
 
     if np.isfinite(slope_below) and np.isfinite(intercept_below):
         fig2.add_trace(go.Scatter(
             x=x_line, y=slope_below * x_line + intercept_below,
             mode="lines", line=dict(color="#E24B4A", width=2),
-            name=f"Régression cash (< {threshold})"
+            name=f"Cash regression (< {threshold})"
         ))
-
-    # # Boxplot cash — rendements réels sur yaxis2
-    # fig2.add_trace(go.Box(
-    #     y=x_all[mask_below],
-    #     x=["Cash"] * mask_below.sum(),
-    #     name="Cash — rendements réels",
-    #     marker_color="#E24B4A",
-    #     boxmean=True,
-    #     width=0.3,
-    #     xaxis="x2",
-    #     yaxis="y2"
-    # ))
-
-    # # Boxplot investi — rendements réels sur yaxis2
-    # fig2.add_trace(go.Box(
-    #     y=x_all[mask_above],
-    #     x=["Investi"] * mask_above.sum(),
-    #     name="Investi — rendements réels",
-    #     marker_color="#1D9E75",
-    #     boxmean=True,
-    #     width=0.3,
-    #     xaxis="x2",
-    #     yaxis="y2"
-    # ))
 
     fig2.add_vline(x=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7,
                    annotation_text=f"Threshold ({threshold})", annotation_position="top right")
@@ -258,39 +225,39 @@ if "df" in st.session_state:
     fig2.update_layout(
         template="plotly_dark",
         height=500,
-        xaxis=dict(title="Probabilité du signal", domain=[0, 0.78]),
+        xaxis=dict(title="Signal probability", domain=[0, 0.78]),
         xaxis2=dict(domain=[0.82, 1]),
-        yaxis=dict(title="Mouvement réel à t+horizon (%)"),
-        yaxis2=dict(title="Rendement réel (%)", anchor="x2"),
+        yaxis=dict(title="Actual movement at t+horizon (%)"),
+        yaxis2=dict(title="Actual return (%)", anchor="x2"),
         legend=dict(orientation="h", y=-0.2),
         boxmode="group"
     )
     st.plotly_chart(fig2, use_container_width=True, key="fig_scatter")
 
-    # Résumé
-    st.subheader("Résumé")
+    # Summary
+    st.subheader("Summary")
     n_buy = int((df["prediction"] == 1).sum())
     n_total = len(df)
     col1, col2, col3 = st.columns(3)
-    col1.metric("Signaux achat", f"{n_buy}/{n_total}")
-    col2.metric("Probabilité moyenne", f"{df['probability'].mean():.2%}")
-    col3.metric("Dernière prédiction", "ACHETER" if df['prediction'].iloc[-1] == 1 else "CASH")
+    col1.metric("Buy signals", f"{n_buy}/{n_total}")
+    col2.metric("Average probability", f"{df['probability'].mean():.2%}")
+    col3.metric("Latest prediction", "BUY" if df['prediction'].iloc[-1] == 1 else "CASH")
 
     st.divider()
-    with st.expander("Données brutes (20 dernières lignes)"):
+
+    with st.expander("Raw data (last 20 rows)"):
+
+
         st.dataframe(
             df[["Date", "Close", "prediction", "probability"]].tail(20),
             use_container_width=True
         )
 
 
-# ── STATS DE PERFORMANCE ─────────────────────────────────────
-    st.subheader("Statistiques de performance")
+    # ── PERFORMANCE STATS ─────────────────────────────────────
+    st.subheader("Performance statistics")
 
-    import numpy as np
-    from scipy import stats as scipy_stats
-
-    TRADING_DAYS_PER_YEAR = 365  # crypto = 365j
+    TRADING_DAYS_PER_YEAR = 365
 
     def compute_stats(values, label):
         s = pd.Series(values)
@@ -299,33 +266,22 @@ if "df" in st.session_state:
         if n == 0:
             return {}
 
-        # Rendement annualisé géométrique
         wealth = (1 + daily_ret).prod()
         ann_ret = wealth ** (TRADING_DAYS_PER_YEAR / n) - 1
-
-        # Volatilité annualisée
         ann_vol = daily_ret.std(ddof=1) * np.sqrt(TRADING_DAYS_PER_YEAR)
-
-        # Sharpe (rf=0)
         sharpe = (daily_ret.mean() / daily_ret.std(ddof=1)) * np.sqrt(TRADING_DAYS_PER_YEAR) if daily_ret.std() > 0 else np.nan
-
-        # Max drawdown
         w = s / s.iloc[0]
         dd = w / w.cummax() - 1
         mdd = dd.min()
-
-        # Skewness / Kurtosis
         skew = scipy_stats.skew(daily_ret, bias=False)
         kurt = scipy_stats.kurtosis(daily_ret, fisher=True, bias=False)
-
-        # Return total
         total_ret = (s.iloc[-1] / s.iloc[0] - 1)
 
         return {
-            "Stratégie": label,
-            "Perf. totale": f"{total_ret:.1%}",
-            "Perf. annualisée": f"{ann_ret:.1%}",
-            "Volatilité ann.": f"{ann_vol:.1%}",
+            "Strategy": label,
+            "Total return": f"{total_ret:.1%}",
+            "Ann. return": f"{ann_ret:.1%}",
+            "Ann. volatility": f"{ann_vol:.1%}",
             "Sharpe": f"{sharpe:.2f}",
             "Max drawdown": f"{mdd:.1%}",
             "Skewness": f"{skew:.2f}",
@@ -334,7 +290,7 @@ if "df" in st.session_state:
 
     stats_rows = []
     strat_vals = {
-        "Prix BTC": btc_base100.tolist(),
+        "BTC Price": btc_base100.tolist(),
     }
     if show_signal:
         strat_vals["Signal ML"] = simulate_portfolio(df, "signal", horizon, threshold)
@@ -347,10 +303,10 @@ if "df" in st.session_state:
     for label, vals in strat_vals.items():
         stats_rows.append(compute_stats(vals, label))
 
-    stats_df = pd.DataFrame(stats_rows).set_index("Stratégie")
+    stats_df = pd.DataFrame(stats_rows).set_index("Strategy")
     st.dataframe(stats_df, use_container_width=True)
 
-    # Accuracy sur les 3 populations
+    # Accuracy on 3 populations
     df_eval = df.copy()
     df_eval["real_up"] = (df_eval["Close"].shift(-horizon) > df_eval["Close"]).astype(int)
     df_eval = df_eval.dropna(subset=["real_up"])
@@ -363,9 +319,99 @@ if "df" in st.session_state:
     acc_cash = (df_eval[mask_cash]["prediction"] == df_eval[mask_cash]["real_up"]).mean()
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Accuracy globale", f"{acc_all:.1%}")
-    col2.metric(f"Accuracy investi (≥{threshold})", f"{acc_inv:.1%}")
-    col3.metric(f"Accuracy cash (<{threshold})", f"{acc_cash:.1%}")
+    col1.metric("Overall accuracy", f"{acc_all:.1%}")
+    col2.metric(f"Invested accuracy (≥{threshold})", f"{acc_inv:.1%}")
+    col3.metric(f"Cash accuracy (<{threshold})", f"{acc_cash:.1%}")
+
+    # ── CALIBRATION ──────────────────────────────────
+    st.subheader("Model calibration")
+    df_eval["proba_bucket"] = pd.cut(df_eval["probability"], bins=10)
+    calib = df_eval.groupby("proba_bucket", observed=True)["real_up"].agg(["mean", "count"])
+    calib["mid"] = [b.mid for b in calib.index]
+
+    fig_cal = go.Figure()
+    fig_cal.add_trace(go.Scatter(
+        x=calib["mid"], y=calib["mean"],
+        mode="markers+lines",
+        marker=dict(size=calib["count"]/calib["count"].max()*20 + 4, color="#EF9F27"),
+        name="Actual upside rate per bucket"
+    ))
+    fig_cal.add_trace(go.Scatter(
+        x=[0.4, 0.7], y=[0.4, 0.7],
+        mode="lines", line=dict(dash="dot", color="gray", width=1),
+        name="Perfect calibration"
+    ))
+    fig_cal.add_vline(x=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7)
+    fig_cal.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.4)
+    fig_cal.update_layout(
+        template="plotly_dark", height=350,
+        xaxis_title="Predicted probability",
+        yaxis_title="Actual upside rate",
+        xaxis=dict(range=[0.4, 0.7]),
+        yaxis=dict(range=[0.3, 0.7])
+    )
+    st.plotly_chart(fig_cal, use_container_width=True, key="fig_calibration")
+
+    # ── ROLLING TEST ──────────────────────────────────
+    st.subheader("Rolling test — 1-month strategy window")
+
+    window = 30
+    results_rolling = []
+    n = len(df)
+
+    for start_idx in range(0, n - window, horizon):
+        end_idx = min(start_idx + window, n - 1)
+        df_window = df.iloc[start_idx:end_idx].reset_index(drop=True)
+        if len(df_window) < horizon + 1:
+            continue
+
+        val_signal = simulate_portfolio(df_window, "flex signal", horizon, threshold)
+        val_long = simulate_portfolio(df_window, "long_only", horizon, threshold)
+
+        results_rolling.append({
+            "start": df_window["Date"].iloc[0],
+            "signal_return": val_signal[-1] - 100,
+            "long_return": val_long[-1] - 100,
+        })
+
+    df_roll = pd.DataFrame(results_rolling)
+
+    fig_roll = go.Figure()
+    fig_roll.add_trace(go.Scatter(
+        x=df_roll["start"], y=df_roll["signal_return"],
+        mode="lines+markers", marker=dict(size=4),
+        line=dict(color="#1D9E75", width=1.5),
+        name="Custom signal"
+    ))
+    fig_roll.add_trace(go.Scatter(
+        x=df_roll["start"], y=df_roll["long_return"],
+        mode="lines+markers", marker=dict(size=4),
+        line=dict(color="#5B8DEF", width=1.5),
+        name="Long only"
+    ))
+    fig_roll.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.4)
+    fig_roll.add_hline(y=df_roll["signal_return"].mean(),
+                       line_dash="dot", line_color="#1D9E75", opacity=0.6,
+                       annotation_text=f"Avg signal {df_roll['signal_return'].mean():.1f}%",
+                       annotation_position="right")
+    fig_roll.add_hline(y=df_roll["long_return"].mean(),
+                       line_dash="dot", line_color="#5B8DEF", opacity=0.6,
+                       annotation_text=f"Avg long only {df_roll['long_return'].mean():.1f}%",
+                       annotation_position="right")
+    fig_roll.update_layout(
+        template="plotly_dark", height=350,
+        xaxis_title="Window start date",
+        yaxis_title="1-month return (%)",
+        legend=dict(orientation="h", y=-0.25)
+    )
+    st.plotly_chart(fig_roll, use_container_width=True, key="fig_rolling")
+
+    pct_beat = (df_roll["signal_return"] > df_roll["long_return"]).mean()
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Windows tested", len(df_roll))
+    col2.metric("Signal beats Long only", f"{pct_beat:.0%}")
+    col3.metric("Avg signal return", f"{df_roll['signal_return'].mean():.1f}%")
+    col4.metric("Avg long only return", f"{df_roll['long_return'].mean():.1f}%")
 
 # ── CALIBRATION ──────────────────────────────────
     st.subheader("Calibration du modèle")

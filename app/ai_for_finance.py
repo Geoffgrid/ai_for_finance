@@ -27,8 +27,8 @@ def my_prediction_function(
 
 
 def xgboost_prediction_function(df:pd.DataFrame):
-    model_xgb_path = os.path.join(ROOT_PATH, 'models', 'xgb_pipeline.pkl')
-
+    model_xgb_path = os.path.join(ROOT_PATH, 'models', 'xgb_pipeline_0426.pkl')
+    #model_xgb_path = os.path.join(ROOT_PATH, 'models', 'average_linear_pipeline.pkl')
     __main__.build_technical_features = build_technical_features
 
     with open(model_xgb_path, 'rb') as file:
