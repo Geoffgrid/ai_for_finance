@@ -46,6 +46,7 @@ def rnn_prediction_function(df: pd.DataFrame):
     return prediction_rnn, probability_rnn
 
 def linear_prediction_function(df:pd.DataFrame):
+    #model_linear_path = os.path.join(ROOT_PATH, 'models', 'last_linear_pipeline.pkl' pb de modèles)
     model_linear_path = os.path.join(ROOT_PATH, 'models', 'average_linear_pipeline.pkl')
 
     __main__.build_technical_features = build_technical_features
