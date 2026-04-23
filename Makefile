@@ -35,3 +35,14 @@ deploy_to_cloud_run:
 
 run_streamlit:
 	streamlit run app/frontend_file.py
+
+deploy_to_cloud_run_poste_geoffroy:
+	gcloud run deploy my-api-app \                                                                                                                                                                                    [🐍 ai_for_finance]
+  --image europe-west1-docker.pkg.dev/ai-for-finance-494120/my-artifact-repo/my-api-app:prod \
+  --memory 1Gi \
+  --region europe-west1 \
+  --platform managed \
+  --allow-unauthenticated \
+  --port 8080 \
+  --timeout 300 \
+  --cpu 1

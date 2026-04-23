@@ -6,7 +6,10 @@ import numpy as np
 from scipy import stats as scipy_stats
 from datetime import date
 
-API_URL = "http://127.0.0.1:8000/global_predict"
+#API_URL = "http://127.0.0.1:8000/global_predict"
+
+
+API_URL ="https://my-api-app-935093493118.europe-west1.run.app/global_predict"
 
 st.set_page_config(layout="wide")
 st.title("Bitcoin — Signal ML")
