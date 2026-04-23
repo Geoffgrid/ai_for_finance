@@ -6,10 +6,7 @@ import numpy as np
 from scipy import stats as scipy_stats
 from datetime import date
 
-#API_URL = "http://127.0.0.1:8000/global_predict"
-
-
-API_URL ="https://my-api-app-935093493118.europe-west1.run.app/global_predict"
+API_URL = "http://127.0.0.1:8000/global_predict"
 
 st.set_page_config(layout="wide")
 st.title("Bitcoin — Signal ML")
@@ -145,7 +142,7 @@ if "df" in st.session_state:
         yaxis_title="Valeur (base 100)",
         legend=dict(orientation="h", y=-0.25)
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key="fig_strategies")
 
     # Nuage de points : probabilité vs mouvement réel
     st.subheader("Probabilité du signal vs mouvement réel")
@@ -268,7 +265,7 @@ if "df" in st.session_state:
         legend=dict(orientation="h", y=-0.2),
         boxmode="group"
     )
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True, key="fig_scatter")
 
     # Résumé
     st.subheader("Résumé")
@@ -280,10 +277,11 @@ if "df" in st.session_state:
     col3.metric("Dernière prédiction", "ACHETER" if df['prediction'].iloc[-1] == 1 else "CASH")
 
     st.divider()
-    st.dataframe(
-        df[["Date", "Close", "prediction", "probability"]].tail(20),
-        use_container_width=True
-    )
+    with st.expander("Données brutes (20 dernières lignes)"):
+        st.dataframe(
+            df[["Date", "Close", "prediction", "probability"]].tail(20),
+            use_container_width=True
+        )
 
 
 # ── STATS DE PERFORMANCE ─────────────────────────────────────
@@ -341,10 +339,10 @@ if "df" in st.session_state:
     if show_signal:
         strat_vals["Signal ML"] = simulate_portfolio(df, "signal", horizon, threshold)
         strat_vals["Signal personnalisé"] = simulate_portfolio(df, "flex signal", horizon, threshold)
-    if show_long_only:
-        strat_vals["Long only"] = simulate_portfolio(df, "long_only", horizon, threshold)
-    if show_random:
-        strat_vals["Random"] = simulate_portfolio(df, "random", horizon, threshold)
+    # if show_long_only:
+    #     strat_vals["Long only"] = simulate_portfolio(df, "long_only", horizon, threshold)
+    # if show_random:
+    #     strat_vals["Random"] = simulate_portfolio(df, "random", horizon, threshold)
 
     for label, vals in strat_vals.items():
         stats_rows.append(compute_stats(vals, label))
@@ -368,6 +366,97 @@ if "df" in st.session_state:
     col1.metric("Accuracy globale", f"{acc_all:.1%}")
     col2.metric(f"Accuracy investi (≥{threshold})", f"{acc_inv:.1%}")
     col3.metric(f"Accuracy cash (<{threshold})", f"{acc_cash:.1%}")
+
+# ── CALIBRATION ──────────────────────────────────
+    st.subheader("Calibration du modèle")
+    df_eval["proba_bucket"] = pd.cut(df_eval["probability"], bins=10)
+    calib = df_eval.groupby("proba_bucket", observed=True)["real_up"].agg(["mean", "count"])
+    calib["mid"] = [b.mid for b in calib.index]
+
+    fig_cal = go.Figure()
+    fig_cal.add_trace(go.Scatter(
+        x=calib["mid"], y=calib["mean"],
+        mode="markers+lines",
+        marker=dict(size=calib["count"]/calib["count"].max()*20 + 4, color="#EF9F27"),
+        name="Taux de hausse réel par bucket"
+    ))
+    fig_cal.add_trace(go.Scatter(
+        x=[0.4, 0.7], y=[0.4, 0.7],
+        mode="lines", line=dict(dash="dot", color="gray", width=1),
+        name="Calibration parfaite"
+    ))
+    fig_cal.add_vline(x=threshold, line_dash="dash", line_color="#1D9E75", opacity=0.7)
+    fig_cal.add_hline(y=0.5, line_dash="dash", line_color="gray", opacity=0.4)
+    fig_cal.update_layout(
+        template="plotly_dark", height=350,
+        xaxis_title="Probabilité prédite",
+        yaxis_title="Taux de hausse réel",
+        xaxis=dict(range=[0.4, 0.7]),
+        yaxis=dict(range=[0.3, 0.7])
+    )
+    st.plotly_chart(fig_cal, use_container_width=True, key="fig_calibration")
+
+    # ── ROLLING TEST ──────────────────────────────────
+    st.subheader("Rolling test — stratégie sur fenêtre 1 mois")
+
+    window = 30
+    results_rolling = []
+    n = len(df)
+
+    for start_idx in range(0, n - window, horizon):
+        end_idx = min(start_idx + window, n - 1)
+        df_window = df.iloc[start_idx:end_idx].reset_index(drop=True)
+        if len(df_window) < horizon + 1:
+            continue
+
+        val_signal = simulate_portfolio(df_window, "flex signal", horizon, threshold)
+        val_long = simulate_portfolio(df_window, "long_only", horizon, threshold)
+
+        results_rolling.append({
+            "start": df_window["Date"].iloc[0],
+            "signal_return": val_signal[-1] - 100,
+            "long_return": val_long[-1] - 100,
+        })
+
+    df_roll = pd.DataFrame(results_rolling)
+
+    fig_roll = go.Figure()
+    fig_roll.add_trace(go.Scatter(
+        x=df_roll["start"], y=df_roll["signal_return"],
+        mode="lines+markers", marker=dict(size=4),
+        line=dict(color="#1D9E75", width=1.5),
+        name="Signal personnalisé"
+    ))
+    fig_roll.add_trace(go.Scatter(
+        x=df_roll["start"], y=df_roll["long_return"],
+        mode="lines+markers", marker=dict(size=4),
+        line=dict(color="#5B8DEF", width=1.5),
+        name="Long only"
+    ))
+    fig_roll.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.4)
+    fig_roll.update_layout(
+        template="plotly_dark", height=350,
+        xaxis_title="Date de début de la fenêtre",
+        yaxis_title="Rendement sur 1 mois (%)",
+        legend=dict(orientation="h", y=-0.25)
+    )
+
+    fig_roll.add_hline(y=df_roll["signal_return"].mean(),
+                       line_dash="dot", line_color="#1D9E75", opacity=0.6,
+                       annotation_text=f"Moy. signal {df_roll['signal_return'].mean():.1f}%",
+                       annotation_position="right")
+    fig_roll.add_hline(y=df_roll["long_return"].mean(),
+                       line_dash="dot", line_color="#5B8DEF", opacity=0.6,
+                       annotation_text=f"Moy. long only {df_roll['long_return'].mean():.1f}%",
+                       annotation_position="right")
+    st.plotly_chart(fig_roll, use_container_width=True, key="fig_rolling")
+
+    pct_beat = (df_roll["signal_return"] > df_roll["long_return"]).mean()
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Fenêtres testées", len(df_roll))
+    col2.metric("Signal bat Long only", f"{pct_beat:.0%}")
+    col3.metric("Rendement moyen signal", f"{df_roll['signal_return'].mean():.1f}%")
+    col4.metric("Rendement moyen long only", f"{df_roll['long_return'].mean():.1f}%")
 
 # ── PERFORMANCES MENSUELLES ──────────────────────────────────
     st.subheader("Performances mensuelles — Signal ML")
