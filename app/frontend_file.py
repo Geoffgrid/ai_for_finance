@@ -7,9 +7,9 @@ from scipy import stats as scipy_stats
 from datetime import date
 import os
 
-DEFAULT_API_URL = os.getenv(
-    "API_URL",
-    "https://my-api-app-935093493118.europe-west1.run.app/global_predict",
+DEFAULT_API_URL = (
+    os.getenv("API_URL")
+    or st.secrets.get("API_URL", "https://my-api-app-935093493118.europe-west1.run.app/global_predict")
 )
 # Backward-compatible alias for older code paths.
 API_URL = DEFAULT_API_URL
