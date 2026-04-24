@@ -12,7 +12,6 @@ import pandas as pd
 
 import __main__
 from app.ml_logic.features import build_technical_features
-import tensorflow.keras.models
 
 KERAS_MODEL_FILENAME = "rnn.keras"
 RNN_ARTIFACTS_FILENAME = "rnn_preprocessing.pkl"

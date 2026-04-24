@@ -5,8 +5,14 @@ import plotly.graph_objects as go
 import numpy as np
 from scipy import stats as scipy_stats
 from datetime import date
+import os
 
-API_URL = "http://127.0.0.1:8000/global_predict"
+DEFAULT_API_URL = os.getenv(
+    "API_URL",
+    "https://my-api-app-935093493118.europe-west1.run.app/global_predict",
+)
+# Backward-compatible alias for older code paths.
+API_URL = DEFAULT_API_URL
 
 st.set_page_config(layout="wide")
 st.title("Bitcoin — Signal ML")
@@ -14,6 +20,7 @@ st.title("Bitcoin — Signal ML")
 # ── SIDE PANEL ──────────────────────────────────────────────────
 with st.sidebar:
     st.header("Paramètres")
+    api_url = st.text_input("API URL", value=DEFAULT_API_URL)
 
     date_pivot = st.date_input("Date cutoff training", value=date(2024, 1, 1), min_value=date(2023, 11, 4), max_value=date.today())
     date_pivot = date_pivot.strftime("%Y-%m-%d")
@@ -44,12 +51,21 @@ with st.sidebar:
 
 # ── DATA LOADING ─────────────────────────────────────────────────
 if load:
-    response = requests.get(API_URL, params={"date_pivot": date_pivot, "model_name": model_name})
-    data = response.json()
-    df = pd.DataFrame(data["df_for_streamlit"])
-    df["Date"] = pd.to_datetime(df["Date"])
-    df = df.sort_values("Date").reset_index(drop=True)
-    st.session_state["df"] = df
+    try:
+        response = requests.get(
+            api_url,
+            params={"date_pivot": date_pivot, "model_name": model_name},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        df = pd.DataFrame(data["df_for_streamlit"])
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values("Date").reset_index(drop=True)
+        st.session_state["df"] = df
+    except requests.RequestException as error:
+        st.error(f"Impossible de joindre l'API: {api_url}")
+        st.exception(error)
 
 # ── CHARTS ───────────────────────────────────────────────────────
 if "df" in st.session_state:

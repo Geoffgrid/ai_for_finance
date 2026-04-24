@@ -5,7 +5,6 @@ import pandas as pd
 
 import __main__
 from app.ml_logic.features import build_technical_features
-from app.ml_logic.rnn_inference import rnn_predict_from_artifacts
 
 
 ROOT_PATH = os.path.dirname(os.path.dirname(__file__))
@@ -41,6 +40,8 @@ def xgboost_prediction_function(df:pd.DataFrame):
 
 def rnn_prediction_function(df: pd.DataFrame):
     __main__.build_technical_features = build_technical_features
+    # Lazy import to avoid loading TensorFlow at API startup.
+    from app.ml_logic.rnn_inference import rnn_predict_from_artifacts
     prediction_rnn, probability_rnn = rnn_predict_from_artifacts(df, ROOT_PATH)
     return prediction_rnn, probability_rnn
 
