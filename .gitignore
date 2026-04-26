@@ -6,3 +6,5 @@ data_folder/
 *_pycache_/
 .env
 .streamlit/secrets.toml
+*.pyc
+__pycache__/
